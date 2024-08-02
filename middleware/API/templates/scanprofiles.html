@@ -1,0 +1,107 @@
+<script>
+
+
+    function loadScanProfiles() {
+        if (window.location.hash === "#scanprofiles") {
+            $.getJSON('/api/scanmodules', function (data) {
+                let table = '<table class="table table-striped">';
+                table += '<thead><tr><th>ID</th><th>Name</th><th>Entries</th><th>Actions</th></tr></thead><tbody>';
+                $.each(data, function (key, entry) {
+                    table += '<tr>';
+                    table += '<td>' + escapeHtml(entry.id) + '</td>';
+                    table += '<td>' + escapeHtml(entry.name) + '</td>';
+                    table += '<td>' + entry.entries.map(e => escapeHtml(e.module_name)).join(", ") + '</td>';
+                    table += '<td><button class="btn btn-primary" onclick="addEntry(' + escapeHtml(entry.id) + ')">Add Entry</button></td>';
+                    table += '</tr>';
+                });
+                table += '</tbody></table>';
+                table += '<button class="btn btn-success" onclick="addScanProfile()">Add New Scan Profile</button>';
+                $('#content').html(table);
+                $('#loading-overlay').hide();
+            });
+        }
+    }
+
+    function addScanProfile() {
+        $.getJSON('/api/scripts', function (modules) {
+            let options = '';
+            $.each(modules, function (key, module) {
+                options += `<option value="${module.id}">` + escapeHtml(`${module.name}`) + `</option>`;
+            });
+            const overlayContent = `
+                    <h3>Add Scan Profile</h3>
+                    <div class="form-group">
+                        <label for="new-profile-name">Name</label>
+                        <input type="text" class="form-control" id="new-profile-name">
+                    </div>
+                    <div class="form-group">
+                        <label for="new-profile-entries">Entries</label>
+                        <select class="form-control" id="new-profile-entries" multiple>${options}</select>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveScanProfile()">Save</button>
+                    <button class="btn btn-secondary" onclick="closeOverlay()">Close</button>
+                `;
+            showOverlay(overlayContent)
+        });
+    }
+
+    function saveScanProfile() {
+        const profileName = $('#new-profile-name').val();
+        const selectedEntries = $('#new-profile-entries').val();
+        const data = {
+            name: profileName,
+            entries: selectedEntries.map(id => ({ module_id: parseInt(id) })) // Convert to array of objects with module_id
+        };
+
+        $.ajax({
+            url: '/api/scanmodules/add',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function (response) {
+                alert('New scan profile added successfully');
+                closeOverlay();
+                loadScanProfiles();
+            }
+        });
+    }
+
+    function addEntry(profileId) {
+        $.getJSON('/api/scripts', function (modules) {
+            let options = '';
+            $.each(modules, function (key, module) {
+                options += `<option value="${module.id}">` + escapeHtml(`${module.name}`) + `</option>`;
+            });
+            const overlayContent = `
+                    <h3>Add Entry</h3>
+                    <input type="hidden" id="profile-id" value="${profileId}">
+                    <div class="form-group">
+                        <label for="module-select">Module</label>
+                        <select class="form-control" id="module-select">${options}</select>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveEntry()">Save</button>
+                    <button class="btn btn-secondary" onclick="closeOverlay()">Close</button>
+                `;
+            showOverlay(overlayContent)
+        });
+    }
+
+    function saveEntry() {
+        const profileId = $('#profile-id').val();
+        const moduleId = $('#module-select').val();
+
+        $.ajax({
+            url: '/api/scanmodules/update',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ profile_id: profileId, module_id: moduleId }),
+            success: function (response) {
+                alert('Entry added successfully');
+                closeOverlay();
+                loadScanProfiles();
+            }
+        });
+    }
+
+    loadScanProfiles()
+</script>

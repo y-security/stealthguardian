@@ -1,0 +1,8 @@
+{
+    "CONFIG": {
+        "SERVICE": "stealthguardian-middleware",
+        "DEBUG": "0",
+        "TIMEOUT": "300",
+        "Version": "1.0"
+    }
+}

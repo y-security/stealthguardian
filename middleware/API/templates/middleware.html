@@ -1,0 +1,83 @@
+<script>
+    function loadMiddlewareSettings() {
+        if (window.location.hash === "#middleware") {
+            $.getJSON('/api/middlewareconfiguration', function (data) {
+                let table = '<table class="table table-striped">';
+                table += '<thead><tr><th>ID</th><th>Key</th><th>Value</th><th>Actions</th></tr></thead><tbody>';
+                $.each(data, function (key, entry) {
+                    table += '<tr>';
+                    table += '<td>' + escapeHtml(entry.id) + '</td>';
+                    table += '<td>' + escapeHtml(entry.key) + '</td>';
+                    if (entry.key.includes('password')) {
+                        table += '<td><input type="password" class="form-control" value="' + escapeHtml(entry.value) + '" id="value-' + escapeHtml(entry.id) + '"></td>';
+                    } else {
+                        table += '<td><input type="text" class="form-control" value="' + escapeHtml(entry.value) + '" id="value-' + escapeHtml(entry.id) + '"></td>';
+                    }
+                    
+                    table += '<td><button id="button-' + escapeHtml(entry.id) + '" class="btn btn-primary" onclick="updateMiddlewareSetting(' + escapeHtml(entry.id) + ')">Update</button></td>';
+                    table += '</tr>';
+                });
+                table += '</tbody></table>';
+                table += '<button class="btn btn-success" onclick="addMiddlewareSetting()">Add New Setting</button>';
+                $('#content').html(table);
+                $('#loading-overlay').hide();
+            });
+        }
+    }
+
+    function updateMiddlewareSetting(id) {
+        const value = $('#value-' + id).val();
+        $.ajax({
+            url: '/api/middlewareconfiguration/update',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ id: id, value: value }),
+            success: function (response) {
+                const updateButton = $('#button-' + id);
+                const originalText = updateButton.text();
+                updateButton.text('Updated');
+                setTimeout(function () {
+                    updateButton.text(originalText);
+                    loadMiddlewareSettings();
+                }, 1000);
+                
+            }
+        });
+    }
+
+    function addMiddlewareSetting() {
+        const overlayContent = `
+                <h3>Add Environment Setting</h3>
+                <div class="form-group">
+                    <label for="new-key">Key</label>
+                    <input type="text" class="form-control" id="new-key">
+                </div>
+                <div class="form-group">
+                    <label for="new-value">Value</label>
+                    <input type="text" class="form-control" id="new-value">
+                </div>
+                <button class="btn btn-primary" onclick="saveMiddlewareSetting()">Save</button>
+                <button class="btn btn-secondary" onclick="closeOverlay()">Close</button>
+            `;
+        showOverlay(overlayContent)
+    }
+
+    function saveMiddlewareSetting() {
+        const key = $('#new-key').val();
+        const value = $('#new-value').val();
+
+        $.ajax({
+            url: '/api/middlewareconfiguration/add',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ key: key, value: value }),
+            success: function (response) {
+                alert('New setting added successfully');
+                closeOverlay();
+                loadMiddlewareSettings();
+            }
+        });
+    }
+
+    loadMiddlewareSettings()
+</script>

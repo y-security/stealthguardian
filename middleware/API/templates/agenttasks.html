@@ -1,0 +1,43 @@
+<script>
+    function loadAgentTasks() {
+        if (window.location.hash === "#agenttasks") {
+            $.getJSON('/api/agenttasks', function (data) {
+                let table = '<table id="agentTasksTable" class="table table-striped table-bordered">';
+                table += '<thead><tr><th>ID</th><th>Timestamp</th><th>Agent UUID</th><th>Command</th><th>Executed</th></tr></thead><tbody>';
+                $.each(data, function (key, entry) {
+                    table += '<tr>';
+                    table += '<td>' + escapeHtml(entry.id) + '</td>';
+                    table += '<td>' + escapeHtml(convertTimestamp(entry.timestamp)) + '</td>';
+                    table += '<td>' + escapeHtml(entry.agentuuid) + '</td>';
+                    table += '<td>' + escapeHtml(entry.command) + '</td>';
+                    table += '<td>' + escapeHtml(entry.executed) + '</td>';
+                    table += '</tr>';
+                });
+                table += '</tbody></table>';
+                $('#content').html(table);
+                
+                // Initialize DataTables with Bootstrap 4 styling
+                $('#agentTasksTable').DataTable({
+                    "fixedHeader": true,
+                    "pageLength": 100,
+                    "lengthChange": false, // Disable user ability to change page length
+                    "dom": '<"top"f>rt<"bottom"p><"clear">', // Remove the length changing element
+                    "language": {
+                        "search": "Search:",
+                        "paginate": {
+                            "first": "First",
+                            "last": "Last",
+                            "next": "Next",
+                            "previous": "Previous"
+                        }
+                    },
+                    "order": [[1, 'desc']] // Order by the second column (timestamp) in descending order
+                });
+
+                $('#loading-overlay').hide();
+            });
+        }
+    }
+
+    loadAgentTasks();
+</script>

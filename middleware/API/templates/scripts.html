@@ -1,0 +1,93 @@
+<script>
+    function loadScripts() {
+        if (window.location.hash === "#scripts") {
+            $.getJSON('/api/scripts', function (data) {
+                let table = '<table class="table table-striped">';
+                table += '<thead><tr><th>ID</th><th>Name</th><th>Actions</th></tr></thead><tbody>';
+                $.each(data, function (key, entry) {
+                    table += '<tr>';
+                    table += '<td>' + escapeHtml(entry.id) + '</td>';
+                    table += '<td>' + escapeHtml(entry.name) + '</td>';
+                    table += '<td><button class="btn btn-primary" onclick="editScript(' + escapeHtml(entry.id) + ', \'' + encodeURIComponent(escapeHtml(entry.name)).replace(/'/g, "%27") + '\', \'' + encodeURIComponent(entry.script) + '\')">Edit</button></td>';
+                    table += '</tr>';
+                });
+                table += '</tbody></table>';
+                table += '<button class="btn btn-success" onclick="addScript()">Add New Script</button>';
+                $('#content').html(table);
+                $('#loading-overlay').hide();
+            });
+        }
+    }
+
+    function addScript() {
+        const overlayContent = `
+                <h3>Add Script</h3>
+                <div class="form-group">
+                    <label for="new-script-name">Name</label>
+                    <input type="text" class="form-control" id="new-script-name">
+                </div>
+                <div class="form-group">
+                    <label for="new-script-content">Script</label>
+                    <textarea class="form-control" id="new-script-content" rows="10"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="saveScript()">Save</button>
+                <button class="btn btn-secondary" onclick="closeOverlay()">Close</button>
+            `;
+        showOverlay(overlayContent)
+    }
+
+    function saveScript() {
+        const name = $('#new-script-name').val();
+        const script = $('#new-script-content').val();
+
+        $.ajax({
+            url: '/api/script/add',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ name: name, script: script }),
+            success: function (response) {
+                alert('New script added successfully');
+                closeOverlay();
+                loadScripts();
+            }
+        });
+    }
+
+
+    function editScript(id, name, script) {
+        const overlayContent = `
+                <h3>Edit Script</h3>
+                <input type="hidden" id="script-id" value="${id}">
+                <input type="hidden" id="script-name" value="${name}">
+                <div class="form-group">
+                    <label for="script-content">Script</label>
+                    <textarea class="form-control" id="script-content" rows="10">${decodeURIComponent(script)}</textarea>
+                </div>
+                <button class="btn btn-primary" onclick="updateScript()">Update</button>
+                <button class="btn btn-secondary" onclick="closeOverlay()">Close</button>
+            `;
+            showOverlay(overlayContent)
+    }
+
+
+
+    function updateScript() {
+        const id = $('#script-id').val();
+        const name = $('#script-name').val();
+        const script = $('#script-content').val();
+
+        $.ajax({
+            url: '/api/scripts/update',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ id: id, name: name, script: script }),
+            success: function (response) {
+                alert('Update successful');
+                closeOverlay();
+                loadScripts();
+            }
+        });
+    }
+
+    loadScripts()
+</script>

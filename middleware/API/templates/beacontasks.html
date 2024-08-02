@@ -1,0 +1,55 @@
+<script>
+    function decodeCommand(command) {
+        try {
+            return atob(command);
+        } catch (e) {
+            return command;
+        }
+    }
+    
+    function loadTasks() {
+        if (window.location.hash === "#beacontasks") {
+            $.getJSON('/api/tasks', function (data) {
+                let table = '<table id="tasksTable" class="table table-striped table-bordered">';
+                table += '<thead><tr><th>ID</th><th>TaskID</th><th>Timestamp</th><th>Source</th><th>SourceBeacon</th><th>Target</th><th>Command</th><th>Status</th><th>Result</th></tr></thead><tbody>';
+                $.each(data, function (key, entry) {
+                    table += '<tr>';
+                    table += '<td>' + escapeHtml(entry.id) + '</td>';
+                    table += '<td>' + escapeHtml(entry.taskid) + '</td>';
+                    table += '<td>' + escapeHtml(convertTimestamp(entry.timestamp)) + '</td>';
+                    table += '<td>' + escapeHtml(entry.source) + '</td>';
+                    table += '<td>' + escapeHtml(entry.sourceBeacon) + '</td>';
+                    table += '<td>' + escapeHtml(entry.targetBeacon) + '</td>';
+                    table += '<td>' + escapeHtml(decodeCommand(entry.command)) + '</td>';
+                    table += '<td>' + escapeHtml(entry.status) + '</td>';
+                    table += '<td>' + escapeHtml(entry.result) + '</td>';
+                    table += '</tr>';
+                });
+                table += '</tbody></table>';
+                $('#content').html(table);
+                
+                // Initialize DataTables with Bootstrap 4 styling
+                $('#tasksTable').DataTable({
+                    "fixedHeader": true,
+                    "pageLength": 100,
+                    "lengthChange": false, // Disable user ability to change page length
+                    "dom": '<"top"f>rt<"bottom"p><"clear">', // Remove the length changing element
+                    "language": {
+                        "search": "Search:",
+                        "paginate": {
+                            "first": "First",
+                            "last": "Last",
+                            "next": "Next",
+                            "previous": "Previous"
+                        }
+                    },
+                    "order": [[2, 'desc']] // Order by the second column (timestamp) in descending order
+                });
+
+                $('#loading-overlay').hide();
+            });
+        }
+    }
+
+    loadTasks();
+</script>

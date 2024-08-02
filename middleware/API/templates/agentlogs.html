@@ -1,0 +1,76 @@
+<script>
+    function loadAgentLogs() {
+        if (window.location.hash === "#agentlogs") {
+
+            $.getJSON('/api/agentlogs', function (data) {
+                let table = '<table id="agentLogsTable" class="table table-striped table-bordered">';
+                table += '<thead><tr><th>ID</th><th>LogCheck</th><th>Agent UUID</th><th>Timestamp</th><th>Status</th><th>Check Type</th><th>Module UUID</th><th>Executed Module</th><th>Notified</th></tr></thead><tbody>';
+                $.each(data, function (key, entry) {
+                    table += '<tr data-logcheck="' + escapeHtml(entry.logcheck) + '">';
+                    table += '<td>' + escapeHtml(entry.id) + '</td>';
+                    table += '<td>' + escapeHtml(entry.logcheck) + '</td>';
+                    table += '<td>' + escapeHtml(entry.agentuuid) + '</td>';
+                    table += '<td>' + escapeHtml(convertTimestamp(entry.timestamp)) + '</td>';
+                    table += '<td>' + (entry.status === 'detected' ? '<span style="color:#FF6961;font-weight:bold;">' + escapeHtml(entry.status) + '</span>' : '<span style="color:#77dd77;font-weight:bold;">' + escapeHtml(entry.status) + '</span>') + '</td>';
+                    table += '<td>' + escapeHtml(entry.check_type) + '</td>';
+                    table += '<td>' + escapeHtml(entry.module_uuid) + '</td>';
+                    table += '<td>' + escapeHtml(entry.executed_module) + '</td>';
+                    table += '<td>' + escapeHtml(entry.notified) + '</td>';
+                    table += '</tr>';
+                });
+                table += '</tbody></table>';
+                $('#content').html(table);
+
+                // Initialize DataTables with Bootstrap 4 styling
+                $('#agentLogsTable').DataTable({
+                    "fixedHeader": true,
+                    "pageLength": 100,
+                    "lengthChange": false, // Disable user ability to change page length
+                    "dom": '<"top"f>rt<"bottom"p><"clear">', // Remove the length changing element
+                    "language": {
+                        "search": "Search:",
+                        "paginate": {
+                            "first": "First",
+                            "last": "Last",
+                            "next": "Next",
+                            "previous": "Previous"
+                        }
+                    },
+                    "order": [[3, 'desc']] // Order by the second column (timestamp) in descending order
+                });
+
+                // Add click event listener to each row
+                $('#agentLogsTable tbody').on('click', 'tr', function() {
+                    let logcheck = $(this).data('logcheck');
+                    loadOverlayContent(logcheck);
+                });
+
+                $('#loading-overlay').hide();
+            });
+
+        }
+    }
+
+    function loadOverlayContent(logcheck) {
+        $.getJSON('/api/agentlogs/log/' + logcheck, function(data) {
+ 
+            data = data[0]
+            let overlayContent = '<h5>Status: ' + '<td>' + (data.status === 'detected' ? '<span style="color:#FF6961;font-weight:bold;">' + escapeHtml(data.status) + '</span>' : '<span style="color:#77dd77;font-weight:bold;">' + escapeHtml(data.status) + '</span>') + '</td>'; + '</h5>';
+            overlayContent += '<h5>LogCheck: ' + escapeHtml(data.logcheck) + '</h5>';
+            overlayContent += '<h5>Executed Module: ' + escapeHtml(data.executed_module) + '</h5>';
+            overlayContent += '<textarea rows="10" cols="50" readonly>' + escapeHtml(data.raw_event) + '</textarea>';
+            $('.overlay-content').html(overlayContent);
+            $('#overlay').show();
+        });
+    }
+
+    $(document).ready(function() {
+        // Hide overlay when clicked outside of the content
+        $('#overlay').on('click', function(event) {
+            if (event.target.id === 'overlay') {
+                $('#overlay').hide();
+            }
+        });
+        loadAgentLogs();
+    });
+</script>

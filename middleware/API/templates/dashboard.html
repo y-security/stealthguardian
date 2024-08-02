@@ -1,0 +1,51 @@
+<div class="container mt-5">
+    <div >
+        <p class="lead">Performing adversary simulation exercises is a time-consuming task, especially when developing new attack mechanisms and testing those against defence systems that have been deployed to the target.</p>
+        <p>With this tool we have streamlined the process of testing developed tools and attack patterns by forwarding those into a reference system and observing logfiles and alarm messages of defence tools. Based upon the results the tool decides if it would be safe to execute the action or let the Red Team know that the action has been detected.</p>
+        <p>The tool is easy to be integrated into existing adversary simulation tools and also easy to be extended with new defence systems.</p>
+    </div>
+    
+    <div id="versionInfo" class="mb-5"></div>
+    
+    <footer>
+        <p>For more information, visit our <a href="https://github.com/y-security/stealthguardian" target="_blank">GitHub repository</a>.</p>
+    </footer>
+
+    <div>
+        <a href="https://www.y-security.de/" target="_blank">
+            <img src="static/Y-Security_logo.png" style="width: 30%; height: auto;"></img>
+        </a>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        function loadVersionInfo() {
+            $.getJSON('/api/version', function (data) {
+                let content = '<h2>Tool Information</h2>';
+                content += '<table class="table table-bordered">';
+                content += '<tr><th>TOOL</th><td>' + escapeHtml(data.TOOL) + '</td></tr>';
+                content += '<tr><th>Version</th><td>' + escapeHtml(data.Version) + '</td></tr>';
+                content += '</table>';
+                $('#versionInfo').html(content);
+                $('#loading-overlay').hide();
+            });
+        }
+        
+        // Function to escape HTML for safe display
+        function escapeHtml(string) {
+            return String(string).replace(/[&<>"']/g, function (s) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                }[s];
+            });
+        }
+
+        loadVersionInfo();
+    });
+</script>
+

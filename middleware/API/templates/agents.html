@@ -1,0 +1,150 @@
+<script>
+    function escapeHtml(text) {
+        return $('<div>').text(text).html();
+    }
+
+    function loadAgents() {
+        if (window.location.hash === "#agents") {
+            $.getJSON('/api/scanmodules', function (scanModuleData) {
+                let scanModuleOptions = '';
+                scanModuleData.forEach(function (module) {
+                    scanModuleOptions += '<option value="' + escapeHtml(module.id) + '">' + escapeHtml(module.name) + '</option>';
+                });
+
+                $.getJSON('/api/beacons', function (beaconData) {
+                    let beaconOptions = '';
+                    beaconData.forEach(function (beacon) {
+                        beaconOptions += '<option value="' + escapeHtml(beacon.uuid) + ' (' + escapeHtml(beacon.name) + ')"></option>';
+                    });
+
+                    // Append a single datalist to the body
+                    $('body').append('<datalist id="beacon-list">' + beaconOptions + '</datalist>');
+
+                    $.getJSON('/api/endpoints', function (data) {
+                        let table = '<table id="agentsTable" class="table table-striped table-bordered">';
+                        table += '<thead><tr><th>ID</th><th>UUID</th><th>Name</th><th>Activated</th><th>Scan Profile</th><th>Reference Beacon</th></tr></thead><tbody>';
+                        $.each(data, function (key, entry) {
+                            table += '<tr>';
+                            table += '<td>' + escapeHtml(entry.id) + '</td>';
+                            table += '<td>' + escapeHtml(entry.uuid) + '</td>';
+                            table += '<td>' + escapeHtml(entry.name) + '</td>';
+                            table += '<td>' + escapeHtml(entry.activated) + '</td>';
+                            table += '<td>';
+                            table += '<select class="scan-profile-select" data-agent-id="' + escapeHtml(entry.uuid) + '">';
+                            table += '<option value="">Select Scan Profile</option>';
+                            scanModuleData.forEach(function (module) {
+                                const selected = entry.agentmodules === module.id ? ' selected' : '';
+                                table += '<option value="' + escapeHtml(module.id) + '"' + selected + '>' + escapeHtml(module.name) + '</option>';
+                            });
+                            table += '</select>';
+                            table += '</td>';
+                            table += '<td>';
+                            table += '<input list="beacon-list" name="beacon" class="reference-beacon-input" data-agent-uuid="' + escapeHtml(entry.uuid) + '" style="width: 500px;" value="' + (escapeHtml(entry.referenceBeacon) ? escapeHtml(entry.referenceBeacon) + ' (' + escapeHtml(beaconData.find(b => b.uuid === entry.referenceBeacon).name) + ')' : '') + '">';
+                            table += '</td>';
+                            table += '</tr>';
+                        });
+                        table += '</tbody></table>';
+                        $('#content').html(table);
+
+                        // Initialize DataTables with Bootstrap 4 styling
+                        $('#agentsTable').DataTable({
+                            "fixedHeader": true,
+                            "pageLength": 100,
+                            "lengthChange": false, // Disable user ability to change page length
+                            "dom": '<"top"f>rt<"bottom"p><"clear">', // Remove the length changing element
+                            "language": {
+                                "search": "Search:",
+                                "paginate": {
+                                    "first": "First",
+                                    "last": "Last",
+                                    "next": "Next",
+                                    "previous": "Previous"
+                                }
+                            }
+                        });
+
+                        $('#loading-overlay').hide();
+
+                        // Event listener to handle input change and send request to endpoints/assign
+                        $('input[list="beacon-list"]').on('input', function () {
+                            var input = $(this);
+                            var value = input.val();
+                            var beaconUUID = value.split(' ')[0]; // Extract the UUID part
+                            var agentUUID = input.data('agent-uuid');
+
+                            // Find the beacon by UUID
+                            var selectedBeacon = beaconData.find(function (beacon) {
+                                return beacon.uuid === beaconUUID;
+                            });
+
+                            if (selectedBeacon) {
+                                $.ajax({
+                                    url: '/api/endpoints/assign',
+                                    method: 'POST',
+                                    contentType: 'application/json',
+                                    data: JSON.stringify({
+                                        agentUUID: agentUUID,
+                                        beaconUUID: selectedBeacon.uuid
+                                    }),
+                                    success: function (response) {
+                                        console.log('Beacon assigned successfully:', response);
+                                    },
+                                    error: function (error) {
+                                        console.error('Error assigning beacon:', error);
+                                    }
+                                });
+                            }
+                        });
+
+                        // Event listener to handle scan profile change
+                        $('.scan-profile-select').on('change', function () {
+                            var select = $(this);
+                            var agentUUID = select.data('agent-id');
+                            var scanProfileId = select.val();
+
+                            $.ajax({
+                                url: '/api/endpoints/assignscanprofile',
+                                method: 'POST',
+                                contentType: 'application/json',
+                                data: JSON.stringify({
+                                    agentUUID: agentUUID,
+                                    scanProfileId: scanProfileId
+                                }),
+                                success: function (response) {
+                                    console.log('Scan profile assigned successfully:', response);
+
+                                    // Make an additional request to agenttask/updateconfig
+                                    $.ajax({
+                                        url: '/api/agenttask/updateconfig',
+                                        method: 'POST',
+                                        contentType: 'application/json',
+                                        data: JSON.stringify({
+                                            agentuuid: agentUUID
+                                        }),
+                                        success: function (response) {
+                                            console.log('Config updated successfully:', response);
+                                        },
+                                        error: function (error) {
+                                            console.error('Error updating config:', error);
+                                        }
+                                    });
+                                },
+                                error: function (error) {
+                                    console.error('Error assigning scan profile:', error);
+                                }
+                            });
+                        });
+                    });
+                });
+            });
+        }
+    }
+    loadAgents();
+</script>
+
+<style>
+    .dropdown-menu {
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+</style>
