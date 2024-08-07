@@ -115,7 +115,8 @@ The below may help you to get the most out of `StealthGuardian`. If you don't fi
 > This is up to you and the detected type of event. In some cases `EDR` systems may work differently or even stricter if a malicious event was recognized on the system. In most cases it is recommended to create snapshots of your system, e.g. after installing the `Beacon` and `Agent` to easily revert back to a secure state.
 
 **Why Are Logs Not Automatically Checked after a Command was Issued**
-Most Adversary Toolkits operate asynchronously, meaning we do not always know when a command has been fully executed. Therefore, we continuously gather information from the reference system and provide the option to manually request a check for detected events.
+
+> Most Adversary Toolkits operate asynchronously, meaning we do not always know when a command has been fully executed. Therefore, we continuously gather information from the reference system and provide the option to manually request a check for detected events.
 
 
 # License
@@ -125,4 +126,4 @@ Released under [GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007](https://gith
 # Changelog
 | Date       | Version | Information                                       |
 | ---------- | ------- | ------------------------------------------------- |
-| 08.08.2024 | 1.0     | First release to the public at Black Hat USA 2024 |
+| 07.08.2024 | 1.0     | First release to the public at Black Hat USA 2024 |
